@@ -31,94 +31,99 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final model = AppScope.of(context).model;
-    final s = model.settings;
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _Section(title: 'Video'),
-          _Tile(
-            title: 'Resolution',
-            subtitle: _resLabel(s.resolution),
-            trailing: DropdownButton<VideoResolution>(
-              value: s.resolution,
-              onChanged: (v) { if (v != null) { model.updateSettings((s) => s.resolution = v); }},
-              items: const [
-                DropdownMenuItem(value: VideoResolution.p1080, child: Text('1080p')),
-                DropdownMenuItem(value: VideoResolution.p720, child: Text('720p')),
-                DropdownMenuItem(value: VideoResolution.p480, child: Text('480p')),
-              ],
-            ),
-          ),
-          _Tile(
-            title: 'Frame rate',
-            subtitle: '${s.fps} FPS',
-            trailing: DropdownButton<int>(
-              value: s.fps,
-              onChanged: (v) { if (v != null) { model.updateSettings((s) => s.fps = v); }},
-              items: const [
-                DropdownMenuItem(value: 24, child: Text('24')), DropdownMenuItem(value: 30, child: Text('30')), DropdownMenuItem(value: 60, child: Text('60')),
-              ],
-            ),
-          ),
-          _Tile(
-            title: 'Bitrate',
-            subtitle: '${(s.bitrateKbps / 1000).toStringAsFixed(0)} Mbps',
-            trailing: DropdownButton<int>(
-              value: s.bitrateKbps,
-              onChanged: (v) { if (v != null) { model.updateSettings((s) => s.bitrateKbps = v); }},
-              items: const [
-                DropdownMenuItem(value: 4000, child: Text('4 Mbps')),
-                DropdownMenuItem(value: 8000, child: Text('8 Mbps')),
-                DropdownMenuItem(value: 12000, child: Text('12 Mbps')),
-                DropdownMenuItem(value: 20000, child: Text('20 Mbps')),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          _Section(title: 'Audio'),
-          SwitchListTile(
-            title: const Text('Record audio'),
-            subtitle: const Text('Include microphone input'),
-            value: s.includeAudio,
-            onChanged: (v) async {
-              model.updateSettings((s) => s.includeAudio = v);
-              if (v) {
-                try { await const MethodChannel('com.example.screen_recorder/recorder').invokeMethod('requestRecordAudioPermission'); } catch (_) {}
-              }
-            },
-          ),
-          _Tile(
-            title: 'Countdown',
-            subtitle: '${s.countdownSeconds} seconds',
-            onTap: () async {
-              final v = await showDialog<int>(context: context, builder: (_) => _CountdownDialog(initial: s.countdownSeconds));
-              if (v != null) { model.updateSettings((s) => s.countdownSeconds = v); }
-            },
-          ),
-          const SizedBox(height: 8),
-          _Section(title: 'Appearance'),
-          _Tile(
-            title: 'Theme',
-            subtitle: _themeLabel(model.themeMode),
-            onTap: () async {
-              final mode = await showModalBottomSheet<ThemeMode>(
-                context: context,
-                showDragHandle: true,
-                builder: (_) => _ThemePicker(current: model.themeMode),
-              );
-              if (mode != null) AppScope.of(context).model.setThemeMode(mode);
-            },
-          ),
-          const SizedBox(height: 8),
-          _Section(title: 'Support'),
-          _Tile(
-            title: 'Contact',
-            subtitle: 'Get in touch',
-            onTap: () => Navigator.pushNamed(context, '/contact'),
-          ),
-        ],
+      body: AnimatedBuilder(
+        animation: model,
+        builder: (context, _) {
+          final s = model.settings;
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _Section(title: 'Video'),
+              _Tile(
+                title: 'Resolution',
+                subtitle: _resLabel(s.resolution),
+                trailing: DropdownButton<VideoResolution>(
+                  value: s.resolution,
+                  onChanged: (v) { if (v != null) { model.updateSettings((s) => s.resolution = v); }},
+                  items: const [
+                    DropdownMenuItem(value: VideoResolution.p1080, child: Text('1080p')),
+                    DropdownMenuItem(value: VideoResolution.p720, child: Text('720p')),
+                    DropdownMenuItem(value: VideoResolution.p480, child: Text('480p')),
+                  ],
+                ),
+              ),
+              _Tile(
+                title: 'Frame rate',
+                subtitle: '${s.fps} FPS',
+                trailing: DropdownButton<int>(
+                  value: s.fps,
+                  onChanged: (v) { if (v != null) { model.updateSettings((s) => s.fps = v); }},
+                  items: const [
+                    DropdownMenuItem(value: 24, child: Text('24')), DropdownMenuItem(value: 30, child: Text('30')), DropdownMenuItem(value: 60, child: Text('60')),
+                  ],
+                ),
+              ),
+              _Tile(
+                title: 'Bitrate',
+                subtitle: '${(s.bitrateKbps / 1000).toStringAsFixed(0)} Mbps',
+                trailing: DropdownButton<int>(
+                  value: s.bitrateKbps,
+                  onChanged: (v) { if (v != null) { model.updateSettings((s) => s.bitrateKbps = v); }},
+                  items: const [
+                    DropdownMenuItem(value: 4000, child: Text('4 Mbps')),
+                    DropdownMenuItem(value: 8000, child: Text('8 Mbps')),
+                    DropdownMenuItem(value: 12000, child: Text('12 Mbps')),
+                    DropdownMenuItem(value: 20000, child: Text('20 Mbps')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              _Section(title: 'Audio'),
+              SwitchListTile(
+                title: const Text('Record audio'),
+                subtitle: const Text('Include microphone input'),
+                value: s.includeAudio,
+                onChanged: (v) async {
+                  model.updateSettings((s) => s.includeAudio = v);
+                  if (v) {
+                    try { await const MethodChannel('com.example.screen_recorder/recorder').invokeMethod('requestRecordAudioPermission'); } catch (_) {}
+                  }
+                },
+              ),
+              _Tile(
+                title: 'Countdown',
+                subtitle: '${s.countdownSeconds} seconds',
+                onTap: () async {
+                  final v = await showDialog<int>(context: context, builder: (_) => _CountdownDialog(initial: s.countdownSeconds));
+                  if (v != null) { model.updateSettings((s) => s.countdownSeconds = v); }
+                },
+              ),
+              const SizedBox(height: 8),
+              _Section(title: 'Appearance'),
+              _Tile(
+                title: 'Theme',
+                subtitle: _themeLabel(model.themeMode),
+                onTap: () async {
+                  final mode = await showModalBottomSheet<ThemeMode>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (_) => _ThemePicker(current: model.themeMode),
+                  );
+                  if (mode != null) AppScope.of(context).model.setThemeMode(mode);
+                },
+              ),
+              const SizedBox(height: 8),
+              _Section(title: 'Support'),
+              _Tile(
+                title: 'Contact',
+                subtitle: 'Get in touch',
+                onTap: () => Navigator.pushNamed(context, '/contact'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
