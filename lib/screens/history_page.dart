@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../main.dart';
+import 'video_player_page.dart';
 
 class HistoryPage extends StatelessWidget {
   const HistoryPage({super.key});
@@ -25,9 +27,60 @@ class HistoryPage extends StatelessWidget {
                       tileColor: Theme.of(context).colorScheme.surfaceContainerHigh,
                       leading: const Icon(Icons.videocam_rounded),
                       title: Text('${_formatDateTime(s.startedAt)} • ${_formatDuration(s.duration)}'),
-                      subtitle: Text('${_resLabel(s.resolution)} • ${s.fps} FPS • ${(s.bitrateKbps / 1000).toStringAsFixed(0)} Mbps${s.includeAudio ? ' • Audio' : ''}'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () {},
+                      subtitle: Text('${_resLabel(s.resolution)} • ${s.fps} FPS • ${(s.bitrateKbps / 1000).toStringAsFixed(0)} Mbps${s.includeAudio ? ' • Audio' : ''}${s.filePath != null ? '\n${s.filePath}' : ''}'),
+                      isThreeLine: s.filePath != null,
+                      trailing: FilledButton.icon(
+                        onPressed: () async {
+                          var path = s.filePath;
+                          // Try resolve from native if missing
+                          if (path == null) {
+                            try {
+                              const ch = MethodChannel('com.example.screen_recorder/recorder');
+                              path = await ch.invokeMethod<String>('resolveLastRecordingPath');
+                              if (path != null) {
+                                AppScope.of(context).model.setHistoryFilePath(i, path);
+                              }
+                            } catch (_) {}
+                          }
+                          if (path != null && context.mounted) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => VideoPlayerPage(
+                                  pathOrUri: path!,
+                                  title: _formatDateTime(s.startedAt),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Play'),
+                      ),
+                      onTap: () async {
+                        var path = s.filePath;
+                        // Try resolve from native if missing
+                        if (path == null) {
+                          try {
+                            const ch = MethodChannel('com.example.screen_recorder/recorder');
+                            // Use a lookup by timestamp if you implement it natively
+                            path = await ch.invokeMethod<String>('resolveLastRecordingPath');
+                            if (path != null) {
+                              // Persist back into the model for future use
+                              AppScope.of(context).model.setHistoryFilePath(i, path);
+                            }
+                          } catch (_) {}
+                        }
+                        if (path != null && context.mounted) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => VideoPlayerPage(
+                                pathOrUri: path!,
+                                title: _formatDateTime(s.startedAt),
+                              ),
+                            ),
+                          );
+                        }
+                      },
                     );
                   },
                 ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
 import 'home_page.dart';
 import 'history_page.dart';
 import 'settings_page.dart';

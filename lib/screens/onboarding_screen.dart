@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -69,6 +70,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       if (_index < pages.length - 1) {
                         _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
                       } else {
+                        // Persist onboarding completion and navigate
+                        AppScope.of(context).model.setOnboardingCompleted(true);
                         Navigator.of(context).pushReplacementNamed('/root');
                       }
                     },

@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -57,6 +59,18 @@ class MainActivity : FlutterActivity() {
                     requestRecordAudioPermission()
                     result.success(true)
                 }
+                "requestRuntimePermissions" -> {
+                    requestRuntimePermissions()
+                    result.success(true)
+                }
+                "serviceStopAndGetPath" -> {
+                    // Stop the service and return the last saved path
+                    startServiceWithAction(RecorderService.ACTION_STOP)
+                    // Wait a short moment to ensure handleStop() runs
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        result.success(RecorderService.lastSavedPath)
+                    }, 500)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -79,6 +93,38 @@ class MainActivity : FlutterActivity() {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
             }
+        }
+    }
+
+    private fun requestRuntimePermissions() {
+        val perms = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
+                perms += Manifest.permission.READ_MEDIA_VIDEO
+            }
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                perms += Manifest.permission.RECORD_AUDIO
+            }
+        } else if (Build.VERSION.SDK_INT >= 29) {
+            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                perms += Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                perms += Manifest.permission.RECORD_AUDIO
+            }
+        } else {
+            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                perms += Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                perms += Manifest.permission.WRITE_EXTERNAL_STORAGE
+            }
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                perms += Manifest.permission.RECORD_AUDIO
+            }
+        }
+        if (perms.isNotEmpty()) {
+            requestPermissions(perms.toTypedArray(), 1003)
         }
     }
 
@@ -109,7 +155,15 @@ class MainActivity : FlutterActivity() {
 
     private fun startServiceWithAction(action: String) {
         val intent = Intent(this, RecorderService::class.java).apply { this.action = action }
-        startService(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (action == RecorderService.ACTION_START) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } else {
+            startService(intent)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

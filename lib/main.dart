@@ -1,7 +1,11 @@
+// ignore_for_file: unused_element
+
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Screens
 import 'screens/onboarding_screen.dart';
@@ -18,6 +22,7 @@ Future<void> _requestNotificationsIfNeeded() async {
   const ch = MethodChannel('com.example.screen_recorder/recorder');
   try {
     await ch.invokeMethod('requestNotificationPermission');
+    await ch.invokeMethod('requestRuntimePermissions');
   } catch (_) {}
 }
 
@@ -31,6 +36,15 @@ class SRApp extends StatefulWidget {
 class _SRAppState extends State<SRApp> {
   final AppModel model = AppModel();
   late final RecordingController controller = RecordingController(model: model);
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    model.loadFromPrefs().then((_) {
+      if (mounted) setState(() => _loaded = true);
+    });
+  }
 
   @override
   void dispose() {
@@ -66,8 +80,10 @@ class _SRAppState extends State<SRApp> {
             theme: light,
             darkTheme: dark,
             themeMode: model.themeMode,
+            home: _loaded
+                ? (model.hasCompletedOnboarding ? const RootShell() : const OnboardingScreen())
+                : const Scaffold(body: Center(child: CircularProgressIndicator())),
             routes: {
-              '/': (_) => const OnboardingScreen(),
               '/root': (_) => const RootShell(),
               '/contact': (_) => const ContactPage(),
             },
@@ -115,6 +131,25 @@ class RecordingSettings {
     this.includeAudio = true,
     this.countdownSeconds = 3,
   });
+
+  Map<String, dynamic> toMap() => {
+        'resolution': resolution.index,
+        'fps': fps,
+        'bitrateKbps': bitrateKbps,
+        'includeAudio': includeAudio,
+        'countdownSeconds': countdownSeconds,
+      };
+
+  factory RecordingSettings.fromMap(Map<String, dynamic> m) {
+    final resIdx = (m['resolution'] ?? 0) as int;
+    return RecordingSettings(
+      resolution: VideoResolution.values[resIdx.clamp(0, VideoResolution.values.length - 1)],
+      fps: (m['fps'] ?? 30) as int,
+      bitrateKbps: (m['bitrateKbps'] ?? 8000) as int,
+      includeAudio: (m['includeAudio'] ?? true) as bool,
+      countdownSeconds: (m['countdownSeconds'] ?? 3) as int,
+    );
+  }
 }
 
 class RecordingSession {
@@ -125,6 +160,7 @@ class RecordingSession {
   final int fps;
   final int bitrateKbps;
   final bool includeAudio;
+  final String? filePath;
 
   RecordingSession({
     required this.startedAt,
@@ -134,28 +170,155 @@ class RecordingSession {
     required this.fps,
     required this.bitrateKbps,
     required this.includeAudio,
+    this.filePath,
   });
+
+  Map<String, dynamic> toMap() => {
+        'startedAt': startedAt.toIso8601String(),
+        'endedAt': endedAt.toIso8601String(),
+        'durationSeconds': duration.inSeconds,
+        'resolution': resolution.index,
+        'fps': fps,
+        'bitrateKbps': bitrateKbps,
+        'includeAudio': includeAudio,
+        'filePath': filePath,
+      };
+
+  factory RecordingSession.fromMap(Map<String, dynamic> m) {
+    return RecordingSession(
+      startedAt: DateTime.parse(m['startedAt'] as String),
+      endedAt: DateTime.parse(m['endedAt'] as String),
+      duration: Duration(seconds: (m['durationSeconds'] ?? 0) as int),
+      resolution: VideoResolution.values[(m['resolution'] ?? 0) as int],
+      fps: (m['fps'] ?? 30) as int,
+      bitrateKbps: (m['bitrateKbps'] ?? 8000) as int,
+      includeAudio: (m['includeAudio'] ?? true) as bool,
+      filePath: m['filePath'] as String?,
+    );
+  }
+
+  RecordingSession copyWith({
+    DateTime? startedAt,
+    DateTime? endedAt,
+    Duration? duration,
+    VideoResolution? resolution,
+    int? fps,
+    int? bitrateKbps,
+    bool? includeAudio,
+    String? filePath,
+  }) {
+    return RecordingSession(
+      startedAt: startedAt ?? this.startedAt,
+      endedAt: endedAt ?? this.endedAt,
+      duration: duration ?? this.duration,
+      resolution: resolution ?? this.resolution,
+      fps: fps ?? this.fps,
+      bitrateKbps: bitrateKbps ?? this.bitrateKbps,
+      includeAudio: includeAudio ?? this.includeAudio,
+      filePath: filePath ?? this.filePath,
+    );
+  }
 }
 
 class AppModel extends ChangeNotifier {
+  static const _kThemeMode = 'themeMode';
+  static const _kSettings = 'settings';
+  static const _kHistory = 'history';
+  static const _kOnboardingDone = 'onboardingDone';
+
   ThemeMode _themeMode = ThemeMode.system;
   final RecordingSettings settings = RecordingSettings();
   final List<RecordingSession> history = [];
+  bool hasCompletedOnboarding = false;
 
   ThemeMode get themeMode => _themeMode;
 
+  Future<void> loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    hasCompletedOnboarding = prefs.getBool(_kOnboardingDone) ?? false;
+
+    final tm = prefs.getInt(_kThemeMode);
+    if (tm != null) {
+      _themeMode = ThemeMode.values[tm.clamp(0, ThemeMode.values.length - 1)];
+    }
+
+    final settingsJson = prefs.getString(_kSettings);
+    if (settingsJson != null) {
+      try {
+        final map = json.decode(settingsJson) as Map<String, dynamic>;
+        final loaded = RecordingSettings.fromMap(map);
+        settings.resolution = loaded.resolution;
+        settings.fps = loaded.fps;
+        settings.bitrateKbps = loaded.bitrateKbps;
+        settings.includeAudio = loaded.includeAudio;
+        settings.countdownSeconds = loaded.countdownSeconds;
+      } catch (_) {}
+    }
+
+    final historyJson = prefs.getString(_kHistory);
+    history.clear();
+    if (historyJson != null) {
+      try {
+        final list = (json.decode(historyJson) as List)
+            .map((e) => (e as Map).cast<String, dynamic>())
+            .toList();
+        for (final m in list) {
+          history.add(RecordingSession.fromMap(m));
+        }
+      } catch (_) {}
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> _saveThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kThemeMode, _themeMode.index);
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kSettings, json.encode(settings.toMap()));
+  }
+
+  Future<void> _saveHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kHistory, json.encode(history.map((e) => e.toMap()).toList()));
+  }
+
+  Future<void> _saveOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kOnboardingDone, hasCompletedOnboarding);
+  }
+
+  void setOnboardingCompleted(bool v) {
+    hasCompletedOnboarding = v;
+    _saveOnboarding();
+    notifyListeners();
+  }
+
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
+    _saveThemeMode();
     notifyListeners();
   }
 
   void addHistory(RecordingSession s) {
     history.insert(0, s);
+    _saveHistory();
+    notifyListeners();
+  }
+
+  void setHistoryFilePath(int index, String path) {
+    if (index < 0 || index >= history.length) return;
+    history[index] = history[index].copyWith(filePath: path);
+    _saveHistory();
     notifyListeners();
   }
 
   void updateSettings(void Function(RecordingSettings) update) {
     update(settings);
+    _saveSettings();
     notifyListeners();
   }
 }
@@ -225,6 +388,8 @@ class RecordingController extends ChangeNotifier {
       'fps': model.settings.fps,
       'bitrateKbps': model.settings.bitrateKbps,
       'includeAudio': model.settings.includeAudio,
+      // Hint to native code: save under Movies/screen_recorder on device storage
+      'relativeDir': 'Movies/screen_recorder',
     });
   }
 
@@ -248,11 +413,25 @@ class RecordingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void stop() {
+  void stop() async {
     if (state == RecordingState.idle) return;
     _ticker?.cancel();
     _countdownTimer?.cancel();
-    _invoke('serviceStop');
+
+    String? savedPath;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        savedPath = await _ch.invokeMethod<String>('serviceStopAndGetPath');
+      } catch (_) {
+        try { await _ch.invokeMethod('serviceStop'); } catch (_) {}
+      }
+      if (savedPath != null) {
+        try { await _ch.invokeMethod('scanFile', {'path': savedPath}); } catch (_) {}
+      }
+    } else {
+      try { await _ch.invokeMethod('serviceStop'); } catch (_) {}
+    }
+
     final end = DateTime.now();
     final start = _startedAt ?? end;
     if (state == RecordingState.recording || state == RecordingState.paused) {
@@ -264,6 +443,7 @@ class RecordingController extends ChangeNotifier {
         fps: model.settings.fps,
         bitrateKbps: model.settings.bitrateKbps,
         includeAudio: model.settings.includeAudio,
+        filePath: savedPath,
       );
       model.addHistory(session);
     }
