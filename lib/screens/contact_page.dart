@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 class ContactPage extends StatelessWidget {
   const ContactPage({super.key});
 
-  static const String email = 'support@example.com';
+  static const String email = 'mamaruyirga1394@gmail.com';
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +17,7 @@ class ContactPage extends StatelessWidget {
           children: [
             Text('Need help?', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text("Reach out and we'll get back to you."),
+            const Text("Reach out and I'll get back to you."),
             const SizedBox(height: 24),
             Card(
               elevation: 0,

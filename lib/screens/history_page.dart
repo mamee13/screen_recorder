@@ -4,8 +4,42 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import 'video_player_page.dart';
 
-class HistoryPage extends StatelessWidget {
+class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
+
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  List<RecordingSession> _validHistory = [];
+  bool _loading = true;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _loadValidHistory();
+    }
+  }
+
+  Future<void> _loadValidHistory() async {
+    final model = AppScope.of(context).model;
+    final validSessions = <RecordingSession>[];
+    for (final session in model.history) {
+      if (await _fileExistsAsync(session.filePath)) {
+        validSessions.add(session);
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _validHistory = validSessions;
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,16 +47,22 @@ class HistoryPage extends StatelessWidget {
     return AnimatedBuilder(
       animation: model,
       builder: (context, _) {
+        if (_loading) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('History')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
         return Scaffold(
           appBar: AppBar(title: const Text('History')),
-          body: model.history.isEmpty
+          body: _validHistory.isEmpty
               ? const _EmptyHistory()
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
-                  itemCount: model.history.length,
+                  itemCount: _validHistory.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, i) {
-                    final s = model.history[i];
+                    final s = _validHistory[i];
                     return ListTile(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       tileColor: Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -39,7 +79,11 @@ class HistoryPage extends StatelessWidget {
                               const ch = MethodChannel('com.example.screen_recorder/recorder');
                               path = await ch.invokeMethod<String>('resolveLastRecordingPath');
                               if (path != null) {
-                                AppScope.of(context).model.setHistoryFilePath(i, path);
+                                // Find the original index in model.history
+                                final originalIndex = model.history.indexOf(s);
+                                if (originalIndex != -1) {
+                                  AppScope.of(context).model.setHistoryFilePath(originalIndex, path);
+                                }
                               }
                             } catch (_) {}
                           }
@@ -66,8 +110,11 @@ class HistoryPage extends StatelessWidget {
                             // Use a lookup by timestamp if you implement it natively
                             path = await ch.invokeMethod<String>('resolveLastRecordingPath');
                             if (path != null) {
-                              // Persist back into the model for future use
-                              AppScope.of(context).model.setHistoryFilePath(i, path);
+                              // Find the original index in model.history
+                              final originalIndex = model.history.indexOf(s);
+                              if (originalIndex != -1) {
+                                AppScope.of(context).model.setHistoryFilePath(originalIndex, path);
+                              }
                             }
                           } catch (_) {}
                         }
@@ -114,6 +161,21 @@ class _EmptyHistory extends StatelessWidget {
 bool _fileExists(String? path) {
   if (path == null) return true; // Can be resolved later
   if (path.startsWith('content://')) return true; // Assume content URIs are valid
+  return File(path).existsSync();
+}
+
+// Async version to check if file exists
+Future<bool> _fileExistsAsync(String? path) async {
+  if (path == null) return true; // Can be resolved later
+  if (path.startsWith('content://')) {
+    try {
+      const ch = MethodChannel('com.example.screen_recorder/recorder');
+      final exists = await ch.invokeMethod<bool>('checkContentUriExists', path).timeout(const Duration(seconds: 2));
+      return exists ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
   return File(path).existsSync();
 }
 

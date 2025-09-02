@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -107,6 +108,22 @@ class MainActivity : FlutterActivity() {
                 "resolveLastRecordingPath" -> {
                     // Return the last saved path without stopping the service
                     result.success(RecorderService.lastSavedPath)
+                }
+                "checkContentUriExists" -> {
+                    val uriString = call.arguments as? String
+                    if (uriString != null) {
+                        try {
+                            val uri = Uri.parse(uriString)
+                            val inputStream = contentResolver.openInputStream(uri)
+                            val exists = inputStream != null
+                            inputStream?.close()
+                            result.success(exists)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
                 }
                 else -> result.notImplemented()
             }
