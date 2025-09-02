@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:ui';
 
 // Screens
 import 'screens/onboarding_screen.dart';
@@ -325,6 +326,7 @@ class AppModel extends ChangeNotifier {
 
 class RecordingController extends ChangeNotifier {
   static const MethodChannel _ch = MethodChannel('com.example.screen_recorder/recorder');
+  static const EventChannel _eventCh = EventChannel('com.example.screen_recorder/events');
   final AppModel model;
 
   RecordingState state = RecordingState.idle;
@@ -334,8 +336,11 @@ class RecordingController extends ChangeNotifier {
   Timer? _ticker;
   Timer? _countdownTimer;
   DateTime? _startedAt;
+  StreamSubscription? _eventSubscription;
 
-  RecordingController({required this.model});
+  RecordingController({required this.model}) {
+    _eventSubscription = _eventCh.receiveBroadcastStream().listen(_onEvent);
+  }
 
   void start() {
     if (state != RecordingState.idle) return;
@@ -454,10 +459,59 @@ class RecordingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _onEvent(dynamic event) {
+    if (event is String) {
+      switch (event) {
+        case 'paused':
+          if (state == RecordingState.recording) {
+            state = RecordingState.paused;
+            _ticker?.cancel();
+            notifyListeners();
+          }
+          break;
+        case 'resumed':
+          if (state == RecordingState.paused) {
+            state = RecordingState.recording;
+            _ticker?.cancel();
+            _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+              elapsed += const Duration(seconds: 1);
+              notifyListeners();
+            });
+            notifyListeners();
+          }
+          break;
+        case 'stopped':
+          if (state == RecordingState.recording || state == RecordingState.paused) {
+            _ticker?.cancel();
+            _countdownTimer?.cancel();
+            final end = DateTime.now();
+            final start = _startedAt ?? end;
+            final session = RecordingSession(
+              startedAt: start,
+              endedAt: end,
+              duration: elapsed,
+              resolution: model.settings.resolution,
+              fps: model.settings.fps,
+              bitrateKbps: model.settings.bitrateKbps,
+              includeAudio: model.settings.includeAudio,
+            );
+            model.addHistory(session);
+            state = RecordingState.idle;
+            elapsed = Duration.zero;
+            countdownRemaining = 0;
+            _startedAt = null;
+            notifyListeners();
+          }
+          break;
+      }
+    }
+  }
+
   @override
   void dispose() {
     _ticker?.cancel();
     _countdownTimer?.cancel();
+    _eventSubscription?.cancel();
     super.dispose();
   }
 }

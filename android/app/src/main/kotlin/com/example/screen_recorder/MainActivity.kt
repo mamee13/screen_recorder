@@ -11,18 +11,51 @@ import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.EventChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.screen_recorder/recorder"
+    private val EVENT_CHANNEL = "com.example.screen_recorder/events"
 
     private var pendingWidth: Int = 1080
     private var pendingHeight: Int = 1920
     private var pendingFps: Int = 30
     private var pendingBitrateKbps: Int = 8000
     private var pendingIncludeAudio: Boolean = true
+    private var eventSink: EventChannel.EventSink? = null
+
+    companion object {
+        private var instance: MainActivity? = null
+
+        fun sendEventToFlutter(event: String) {
+            instance?.sendEvent(event)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        instance = this
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Set up EventChannel for state updates
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL).setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                eventSink = events
+            }
+
+            override fun onCancel(arguments: Any?) {
+                eventSink = null
+            }
+        })
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "serviceStart" -> {
@@ -164,6 +197,10 @@ class MainActivity : FlutterActivity() {
         } else {
             startService(intent)
         }
+    }
+
+    fun sendEvent(event: String) {
+        eventSink?.success(event)
     }
 
     override fun onNewIntent(intent: Intent) {

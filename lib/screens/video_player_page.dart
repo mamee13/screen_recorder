@@ -110,11 +110,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           ? _ErrorBody(message: _errorMsg)
           : (c == null || !c.value.isInitialized)
               ? const Center(child: CircularProgressIndicator())
-              : _PlayerBody(
-                  controller: c,
-                  isFullscreen: _isFullscreen,
-                  onFullscreenToggle: _toggleFullscreen,
-                ),
+              : (_isFullscreen
+                  ? SafeArea(
+                      left: false,
+                      top: false,
+                      right: false,
+                      bottom: false,
+                      child: _PlayerBody(
+                        controller: c,
+                        isFullscreen: _isFullscreen,
+                        onFullscreenToggle: _toggleFullscreen,
+                      ),
+                    )
+                  : _PlayerBody(
+                      controller: c,
+                      isFullscreen: _isFullscreen,
+                      onFullscreenToggle: _toggleFullscreen,
+                    )),
     );
   }
 }
@@ -135,7 +147,7 @@ class _PlayerBody extends StatefulWidget {
 }
 
 class _PlayerBodyState extends State<_PlayerBody> {
-  bool _controlsVisible = true;
+  bool _controlsVisible = false;
   Timer? _hideControlsTimer;
   double _volume = 1.0;
   double _playbackSpeed = 1.0;
@@ -146,7 +158,6 @@ class _PlayerBodyState extends State<_PlayerBody> {
   void initState() {
     super.initState();
     widget.controller.addListener(_listener);
-    _startHideControlsTimer();
 
     // Ensure video starts playing after a short delay
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -193,6 +204,19 @@ class _PlayerBodyState extends State<_PlayerBody> {
   void _showControls() {
     setState(() => _controlsVisible = true);
     _startHideControlsTimer();
+  }
+
+  void _hideControls() {
+    setState(() => _controlsVisible = false);
+    _hideControlsTimer?.cancel();
+  }
+
+  void _toggleControls() {
+    if (_controlsVisible) {
+      _hideControls();
+    } else {
+      _showControls();
+    }
   }
 
   void _togglePlay() async {
@@ -303,19 +327,33 @@ class _PlayerBodyState extends State<_PlayerBody> {
         }
       },
       child: GestureDetector(
-        onTap: _showControls,
+        onTap: _toggleControls,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(
-              child: AspectRatio(
-                aspectRatio: aspect,
-                child: VideoPlayer(
-                  c,
-                  key: ValueKey('video_player_${c.hashCode}'),
+            if (widget.isFullscreen)
+              SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: AspectRatio(
+                    aspectRatio: aspect,
+                    child: VideoPlayer(
+                      c,
+                      key: ValueKey('video_player_${c.hashCode}'),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Center(
+                child: AspectRatio(
+                  aspectRatio: aspect,
+                  child: VideoPlayer(
+                    c,
+                    key: ValueKey('video_player_${c.hashCode}'),
+                  ),
                 ),
               ),
-            ),
             if (_controlsVisible)
               Positioned.fill(
                 child: Container(

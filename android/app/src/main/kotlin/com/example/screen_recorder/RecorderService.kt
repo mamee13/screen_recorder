@@ -203,6 +203,7 @@ class RecorderService : Service() {
             mediaRecorder?.pause()
             isPaused = true
             updateNotification()
+            MainActivity.sendEventToFlutter("paused")
             Log.d("RecorderService", "Recording paused.")
         } catch (e: Exception) {
             Log.e("RecorderService", "Failed to pause recorder", e)
@@ -215,6 +216,7 @@ class RecorderService : Service() {
             mediaRecorder?.resume()
             isPaused = false
             updateNotification()
+            MainActivity.sendEventToFlutter("resumed")
             Log.d("RecorderService", "Recording resumed.")
         } catch (e: Exception) {
             Log.e("RecorderService", "Failed to resume recorder", e)
@@ -289,7 +291,9 @@ class RecorderService : Service() {
         } else {
             lastSavedPath = null
         }
-        
+
+        MainActivity.sendEventToFlutter("stopped")
+
         // Clean up file descriptors
         try { outputPfd?.close() } catch (e: Exception) { Log.e("RecorderService", "Error closing PFD", e) }
         outputPfd = null
