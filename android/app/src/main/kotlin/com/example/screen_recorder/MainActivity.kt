@@ -104,6 +104,10 @@ class MainActivity : FlutterActivity() {
                         result.success(RecorderService.lastSavedPath)
                     }, 500)
                 }
+                "resolveLastRecordingPath" -> {
+                    // Return the last saved path without stopping the service
+                    result.success(RecorderService.lastSavedPath)
+                }
                 else -> result.notImplemented()
             }
         }

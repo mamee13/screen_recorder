@@ -67,6 +67,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   void dispose() {
     _controller?.dispose();
+    // Reset orientations and UI mode when leaving the page
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
@@ -80,6 +89,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
+      // Ensure video continues playing in fullscreen
+      if (_controller != null) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && !_controller!.value.isPlaying) {
+            _controller!.play();
+          }
+        });
+      }
     } else {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
           overlays: SystemUiOverlay.values);
@@ -110,23 +127,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           ? _ErrorBody(message: _errorMsg)
           : (c == null || !c.value.isInitialized)
               ? const Center(child: CircularProgressIndicator())
-              : (_isFullscreen
-                  ? SafeArea(
-                      left: false,
-                      top: false,
-                      right: false,
-                      bottom: false,
-                      child: _PlayerBody(
-                        controller: c,
-                        isFullscreen: _isFullscreen,
-                        onFullscreenToggle: _toggleFullscreen,
-                      ),
-                    )
-                  : _PlayerBody(
-                      controller: c,
-                      isFullscreen: _isFullscreen,
-                      onFullscreenToggle: _toggleFullscreen,
-                    )),
+              : _PlayerBody(
+                  controller: c,
+                  isFullscreen: _isFullscreen,
+                  onFullscreenToggle: _toggleFullscreen,
+                ),
     );
   }
 }
@@ -335,23 +340,14 @@ class _PlayerBodyState extends State<_PlayerBody> {
               SizedBox.expand(
                 child: FittedBox(
                   fit: BoxFit.cover,
-                  child: AspectRatio(
-                    aspectRatio: aspect,
-                    child: VideoPlayer(
-                      c,
-                      key: ValueKey('video_player_${c.hashCode}'),
-                    ),
-                  ),
+                  child: VideoPlayer(c),
                 ),
               )
             else
               Center(
                 child: AspectRatio(
                   aspectRatio: aspect,
-                  child: VideoPlayer(
-                    c,
-                    key: ValueKey('video_player_${c.hashCode}'),
-                  ),
+                  child: VideoPlayer(c),
                 ),
               ),
             if (_controlsVisible)

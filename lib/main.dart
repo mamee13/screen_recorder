@@ -317,6 +317,13 @@ class AppModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void removeHistory(int index) {
+    if (index < 0 || index >= history.length) return;
+    history.removeAt(index);
+    _saveHistory();
+    notifyListeners();
+  }
+
   void updateSettings(void Function(RecordingSettings) update) {
     update(settings);
     _saveSettings();
@@ -459,7 +466,7 @@ class RecordingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _onEvent(dynamic event) {
+  void _onEvent(dynamic event) async {
     if (event is String) {
       switch (event) {
         case 'paused':
@@ -486,6 +493,12 @@ class RecordingController extends ChangeNotifier {
             _countdownTimer?.cancel();
             final end = DateTime.now();
             final start = _startedAt ?? end;
+            String? savedPath;
+            if (defaultTargetPlatform == TargetPlatform.android) {
+              try {
+                savedPath = await _ch.invokeMethod<String>('resolveLastRecordingPath');
+              } catch (_) {}
+            }
             final session = RecordingSession(
               startedAt: start,
               endedAt: end,
@@ -494,6 +507,7 @@ class RecordingController extends ChangeNotifier {
               fps: model.settings.fps,
               bitrateKbps: model.settings.bitrateKbps,
               includeAudio: model.settings.includeAudio,
+              filePath: savedPath,
             );
             model.addHistory(session);
             state = RecordingState.idle;

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
@@ -109,6 +110,13 @@ class _EmptyHistory extends StatelessWidget {
   }
 }
 
+// Helper to check if file exists
+bool _fileExists(String? path) {
+  if (path == null) return true; // Can be resolved later
+  if (path.startsWith('content://')) return true; // Assume content URIs are valid
+  return File(path).existsSync();
+}
+
 // Local helpers (since private helpers in main.dart are not visible here)
 String _formatDuration(Duration d) {
   final h = d.inHours;
@@ -139,3 +147,4 @@ String _resLabel(VideoResolution r) {
       return '480p';
   }
 }
+
