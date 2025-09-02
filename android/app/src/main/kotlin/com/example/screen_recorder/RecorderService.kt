@@ -9,6 +9,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.pm.PackageManager
+import android.os.ParcelFileDescriptor
 import android.graphics.Color
 import android.media.MediaRecorder
 import android.media.projection.MediaProjection
@@ -40,6 +42,7 @@ class RecorderService : Service() {
     private var mediaRecorder: MediaRecorder? = null
     private var virtualDisplay: android.hardware.display.VirtualDisplay? = null
     private var outputUri: Uri? = null
+    private var outputPfd: ParcelFileDescriptor? = null
 
     private var width: Int = 1080
     private var height: Int = 1920
@@ -94,6 +97,13 @@ class RecorderService : Service() {
             startRecording()
         } catch (e: Exception) {
             Log.e("RecorderService", "Failed to start recording", e)
+            // Clean up a possibly pending MediaStore item to avoid hidden files
+            outputUri?.let { uri ->
+                try { contentResolver.delete(uri, null, null) } catch (_: Exception) {}
+            }
+            outputUri = null
+            try { outputPfd?.close() } catch (_: Exception) {}
+            outputPfd = null
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
@@ -114,19 +124,21 @@ class RecorderService : Service() {
         val resolver = contentResolver
         outputUri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
             ?: throw IllegalStateException("Failed to create MediaStore entry")
+        outputPfd = resolver.openFileDescriptor(outputUri!!, "w")
 
         mediaRecorder = MediaRecorder()
-        if (includeAudio) {
+        val micGranted = includeAudio && (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+        if (micGranted) {
             mediaRecorder?.setAudioSource(MediaRecorder.AudioSource.MIC)
         }
         mediaRecorder?.setVideoSource(MediaRecorder.VideoSource.SURFACE)
         mediaRecorder?.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        mediaRecorder?.setOutputFile(resolver.openFileDescriptor(outputUri!!, "w")!!.fileDescriptor)
+        mediaRecorder?.setOutputFile(outputPfd!!.fileDescriptor)
         mediaRecorder?.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
         mediaRecorder?.setVideoEncodingBitRate(bitrateKbps * 1000)
         mediaRecorder?.setVideoFrameRate(fps)
         mediaRecorder?.setVideoSize(width, height)
-        if (includeAudio) {
+        if (micGranted) {
             mediaRecorder?.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             mediaRecorder?.setAudioEncodingBitRate(128_000)
             mediaRecorder?.setAudioSamplingRate(44100)
@@ -194,6 +206,8 @@ class RecorderService : Service() {
             }
         } catch (_: Exception) {}
         mediaRecorder = null
+        try { outputPfd?.close() } catch (_: Exception) {}
+        outputPfd = null
 
         try {
             virtualDisplay?.release()
