@@ -173,51 +173,11 @@ class _QuickSettings extends StatelessWidget {
           children: [
             Text('Quick settings', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _ChipDropdown<VideoResolution>(
-                  label: 'Resolution',
-                  value: s.resolution,
-                  items: const {
-                    VideoResolution.p1080: '1080p',
-                    VideoResolution.p720: '720p',
-                    VideoResolution.p480: '480p',
-                  },
-                  onChanged: (v) {
-                    if (v == null) return;
-                    model.updateSettings((s) => s.resolution = v);
-                  },
-                ),
-                _ChipDropdown<int>(
-                  label: 'FPS',
-                  value: s.fps,
-                  items: const {
-                    24: '24',
-                    30: '30',
-                    60: '60',
-                  },
-                  onChanged: (v) {
-                    if (v == null) return;
-                    model.updateSettings((s) => s.fps = v);
-                  },
-                ),
-                _ChipDropdown<int>(
-                  label: 'Bitrate',
-                  value: s.bitrateKbps,
-                  items: const {
-                    4000: '4 Mbps',
-                    8000: '8 Mbps',
-                    12000: '12 Mbps',
-                    20000: '20 Mbps',
-                  },
-                  onChanged: (v) {
-                    if (v == null) return;
-                    model.updateSettings((s) => s.bitrateKbps = v);
-                  },
-                ),
                 FilterChip(
+                  avatar: const Icon(Icons.mic, size: 18),
                   label: const Text('Audio'),
                   selected: s.includeAudio,
                   onSelected: (sel) async {
@@ -227,7 +187,9 @@ class _QuickSettings extends StatelessWidget {
                     }
                   },
                 ),
+                const SizedBox(width: 16),
                 InputChip(
+                  avatar: const Icon(Icons.timer, size: 18),
                   label: Text('Countdown: ${s.countdownSeconds}s'),
                   onPressed: () async {
                     final v = await showDialog<int>(context: context, builder: (_) => _CountdownDialog(initial: s.countdownSeconds));
@@ -273,8 +235,9 @@ class _ChipDropdown<T> extends StatelessWidget {
   final T value;
   final Map<T, String> items;
   final ValueChanged<T?> onChanged;
+  final IconData? icon;
 
-  const _ChipDropdown({required this.label, required this.value, required this.items, required this.onChanged});
+  const _ChipDropdown({required this.label, required this.value, required this.items, required this.onChanged, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +249,7 @@ class _ChipDropdown<T> extends StatelessWidget {
           .map((e) => PopupMenuItem<T>(value: e.key, child: Text(e.value)))
           .toList(),
       child: InputChip(
+        avatar: icon != null ? Icon(icon, size: 18) : null,
         label: Text('$label: ${items[value]}'),
         onPressed: () {},
       ),
