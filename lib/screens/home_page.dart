@@ -260,7 +260,7 @@ class _TipsCard extends StatelessWidget {
           children: [
             Text('Tip', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('After initial run, a persistent notification with quick actions (Start, Pause/Resume, Stop) will be available once platform integration is added.', style: textStyle),
+            Text('After initial run, a persistent notification with quick actions (Start, Pause/Resume, Stop) will be available once the record starts.', style: textStyle),
           ],
         ),
       ),
