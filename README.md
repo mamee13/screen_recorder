@@ -15,7 +15,7 @@ A Flutter-based screen recording app for Android devices. Easily record your scr
 
 ## Download
 
-[![Download Latest Release](https://img.shields.io/github/v/release/mamee13/screen_recorder?label=Download)](https://github.com/mamee13/screen_recorder/releases/latest/download/screen_recorder.apk)
+[![Download Latest Release](https://img.shields.io/github/v/release/mamee13/screen_recorder?label=Download)](https://github.com/mamee13/screen_recorder/releases/latest/download/screen.recorder.apk)
 
 ## Installation
 
